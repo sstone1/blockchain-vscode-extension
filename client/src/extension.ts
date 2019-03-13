@@ -73,6 +73,7 @@ import { FabricGoDebugConfigurationProvider } from './debug/FabricGoDebugConfigu
 import { importSmartContractPackageCommand } from './commands/importSmartContractPackageCommand';
 import { CertificateAuthorityTreeItem } from './explorer/runtimeOps/CertificateAuthorityTreeItem';
 import { FabricJavaDebugConfigurationProvider } from './debug/FabricJavaDebugConfigurationProvider';
+import { BlockchainUriHandler } from './uris/BlockchainUriHandler';
 
 let blockchainGatewayExplorerProvider: BlockchainGatewayExplorerProvider;
 let blockchainPackageExplorerProvider: BlockchainPackageExplorerProvider;
@@ -150,6 +151,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             // Open the Home page
             await vscode.commands.executeCommand(ExtensionCommands.OPEN_HOME_PAGE);
         }
+
+        vscode.window.registerUriHandler(BlockchainUriHandler.instance());
+
     } catch (error) {
         console.log(error);
         outputAdapter.log(LogType.ERROR, 'Failed to activate extension: open output view', 'Failed to activate extension see previous messages for reason');
