@@ -14,18 +14,15 @@
 'use strict';
 
 import { PackageRegistryEntry } from '../packages/PackageRegistryEntry';
-import { IFabricWallet } from './IFabricWallet';
-import { FabricWalletRegistryEntry } from './FabricWalletRegistryEntry';
+import { FabricNode } from './FabricRuntime';
 
 export interface IFabricRuntimeConnection {
 
-    identityName: string;
-
-    wallet: FabricWalletRegistryEntry;
-
-    connect(wallet: IFabricWallet, identityName: string): Promise<void>;
+    connect(): Promise<void>;
 
     disconnect(): void;
+
+    getNode(nodeName: string): FabricNode;
 
     getAllPeerNames(): Array<string>;
 
@@ -39,7 +36,7 @@ export interface IFabricRuntimeConnection {
 
     getInstantiatedChaincode(channelName: string): Promise<Array<{name: string, version: string}>>;
 
-    getAllOrdererNames(): Promise<Array<string>>;
+    getAllOrdererNames(): Array<string>;
 
     installChaincode(packageRegistryEntry: PackageRegistryEntry, peerName: string): Promise<void>;
 
@@ -47,8 +44,7 @@ export interface IFabricRuntimeConnection {
 
     upgradeChaincode(chaincodeName: string, version: string, channel: string, fcn: string, args: Array<string>): Promise<void>;
 
-    enroll(enrollmentID: string, enrollmentSecret: string): Promise<{certificate: string, privateKey: string}>;
+    enroll(certificateAuthorityName: string, enrollmentID: string, enrollmentSecret: string): Promise<{certificate: string, privateKey: string}>;
 
-    register(enrollmentID: string, affiliation: string): Promise<string>;
-
+    register(certificateAuthorityName: string, enrollmentID: string, affiliation: string): Promise<string>;
 }

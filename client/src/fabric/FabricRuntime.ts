@@ -25,21 +25,40 @@ import { UserInputUtil } from '../commands/UserInputUtil';
 import { LogType } from '../logging/OutputAdapter';
 import * as request from 'request';
 
-const basicNetworkPath: string = path.resolve(__dirname, '..', '..', '..', 'basic-network');
-const basicNetworkConnectionProfilePath: string = path.resolve(basicNetworkPath, 'connection.json');
-const basicNetworkConnectionProfile: string = JSON.parse(fs.readFileSync(basicNetworkConnectionProfilePath).toString());
-const basicNetworkAdminPath: string = path.resolve(basicNetworkPath, 'crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com');
-const basicNetworkAdminCertificatePath: string = path.resolve(basicNetworkAdminPath, 'msp/signcerts/Admin@org1.example.com-cert.pem');
-const basicNetworkAdminCertificate: string = fs.readFileSync(basicNetworkAdminCertificatePath, 'utf8');
-const basicNetworkAdminPrivateKeyPath: string = path.resolve(basicNetworkAdminPath, 'msp/keystore/cd96d5260ad4757551ed4a5a991e62130f8008a0bf996e4e4b84cd097a747fec_sk');
-const basicNetworkAdminPrivateKey: string = fs.readFileSync(basicNetworkAdminPrivateKeyPath, 'utf8');
-
 export enum FabricRuntimeState {
     STARTING = 'starting',
     STARTED = 'started',
     STOPPING = 'stopping',
     STOPPED = 'stopped',
     RESTARTING = 'restarting',
+}
+
+export class FabricGateway {
+    public name: string;
+    public path: string;
+    public connectionProfile: object;
+}
+
+export class FabricIdentity {
+    public name: string;
+    public certificate: string;
+    public private_key: string;
+    public msp_id: string;
+}
+
+export enum FabricNodeType {
+    PEER = 'fabric-peer',
+    CA = 'fabric-ca',
+    ORDERER = 'fabric-orderer'
+}
+
+export class FabricNode {
+    public short_name: string;
+    public name: string;
+    public url: string;
+    public type: FabricNodeType;
+    public wallet: string;
+    public identity: string;
 }
 
 export class FabricRuntime extends EventEmitter {
@@ -49,6 +68,7 @@ export class FabricRuntime extends EventEmitter {
 
     private docker: Docker;
     private name: string;
+    private path: string;
     private busy: boolean = false;
     private state: FabricRuntimeState;
 
@@ -58,10 +78,17 @@ export class FabricRuntime extends EventEmitter {
         super();
         this.name = 'local_fabric';
         this.docker = new Docker(this.name);
+        const extDir: string = vscode.workspace.getConfiguration().get('blockchain.ext.directory');
+        const homeExtDir: string = UserInputUtil.getDirPath(extDir);
+        this.path = path.resolve(homeExtDir, this.name);
     }
 
     public getName(): string {
         return this.name;
+    }
+
+    public getPath(): string {
+        return this.path;
     }
 
     public isBusy(): boolean {
@@ -138,69 +165,111 @@ export class FabricRuntime extends EventEmitter {
         }
     }
 
+    public async getGateways(): Promise<FabricGateway[]> {
+        const gatewaysPath: string = path.resolve(this.path, 'gateways');
+        const gatewaysExist: boolean = await fs.pathExists(gatewaysPath);
+        if (!gatewaysExist) {
+            return [];
+        }
+        let gatewayPaths: string[] = await fs.readdir(gatewaysPath);
+        gatewayPaths = gatewayPaths
+            .filter((gatewayPath: string) => !gatewayPath.startsWith('.'))
+            .map((gatewayPath: string) => path.resolve(this.path, 'gateways', gatewayPath));
+        const gateways: FabricGateway[] = [];
+        for (const gatewayPath of gatewayPaths) {
+            const connectionProfile: any = await fs.readJson(gatewayPath);
+            const gateway: FabricGateway = new FabricGateway();
+            gateway.name = connectionProfile.name;
+            gateway.path = gatewayPath;
+            gateway.connectionProfile = connectionProfile;
+            gateways.push(gateway);
+        }
+        return gateways;
+    }
+
+    public async getNodes(): Promise<FabricNode[]> {
+        const nodesPath: string = path.resolve(this.path, 'nodes');
+        const nodesExist: boolean = await fs.pathExists(nodesPath);
+        if (!nodesExist) {
+            return [];
+        }
+        let nodePaths: string[] = await fs.readdir(nodesPath);
+        nodePaths = nodePaths
+            .filter((nodePath: string) => !nodePath.startsWith('.'))
+            .map((nodePath: string) => path.resolve(this.path, 'nodes', nodePath));
+        const nodes: FabricNode[] = [];
+        for (const nodePath of nodePaths) {
+            const node: FabricNode = await fs.readJson(nodePath);
+            nodes.push(node);
+        }
+        return nodes;
+    }
+
+    public async getWallets(): Promise<string[]> {
+        const walletsPath: string = path.resolve(this.path, 'wallets');
+        const walletsExist: boolean = await fs.pathExists(walletsPath);
+        if (!walletsExist) {
+            return [];
+        }
+        const walletPaths: string[] = await fs.readdir(walletsPath);
+        return walletPaths
+            .filter((walletPath: string) => !walletPath.startsWith('.'));
+    }
+
+    public async getIdentities(wallet: string): Promise<FabricIdentity[]> {
+        const walletPath: string = path.resolve(this.path, 'wallets', wallet);
+        const walletExists: boolean = await fs.pathExists(walletPath);
+        if (!walletExists) {
+            return [];
+        }
+        let identityPaths: string[] = await fs.readdir(walletPath);
+        identityPaths = identityPaths
+            .filter((identityPath: string) => !identityPath.startsWith('.'))
+            .map((identityPath: string) => path.resolve(this.path, 'wallets', wallet, identityPath));
+        const identities: FabricIdentity[] = [];
+        for (const identityPath of identityPaths) {
+            const identity: FabricIdentity = await fs.readJson(identityPath);
+            identities.push(identity);
+        }
+        return identities;
+    }
+
     public async getConnectionProfile(): Promise<object> {
-        const containerPrefix: string = this.docker.getContainerPrefix();
-        const connectionProfile: any = basicNetworkConnectionProfile;
-        const peerPorts: ContainerPorts = await this.docker.getContainerPorts(`${containerPrefix}_peer0.org1.example.com`);
-        const peerRequestHost: string = Docker.fixHost(peerPorts['7051/tcp'][0].HostIp);
-        const peerRequestPort: string = peerPorts['7051/tcp'][0].HostPort;
-        const peerEventHost: string = Docker.fixHost(peerPorts['7053/tcp'][0].HostIp);
-        const peerEventPort: string = peerPorts['7053/tcp'][0].HostPort;
-        const ordererPorts: ContainerPorts = await this.docker.getContainerPorts(`${containerPrefix}_orderer.example.com`);
-        const ordererHost: string = Docker.fixHost(ordererPorts['7050/tcp'][0].HostIp);
-        const ordererPort: string = ordererPorts['7050/tcp'][0].HostPort;
-        const caPorts: ContainerPorts = await this.docker.getContainerPorts(`${containerPrefix}_ca.example.com`);
-        const caHost: string = Docker.fixHost(caPorts['7054/tcp'][0].HostIp);
-        const caPort: string = caPorts['7054/tcp'][0].HostPort;
-        connectionProfile.peers['peer0.org1.example.com'].url = `grpc://${peerRequestHost}:${peerRequestPort}`;
-        connectionProfile.peers['peer0.org1.example.com'].eventUrl = `grpc://${peerEventHost}:${peerEventPort}`;
-        connectionProfile.orderers['orderer.example.com'].url = `grpc://${ordererHost}:${ordererPort}`;
-        connectionProfile.certificateAuthorities['ca.org1.example.com'].url = `http://${caHost}:${caPort}`;
-        return connectionProfile;
+        throw new Error('not supported');
     }
 
     public getConnectionProfilePath(): string {
-        const extDir: string = vscode.workspace.getConfiguration().get('blockchain.ext.directory');
-        const homeExtDir: string = UserInputUtil.getDirPath(extDir);
-        const dir: string = path.join(homeExtDir, this.name);
-
-        return path.join(dir, 'connection.json');
+        throw new Error('not supported');
     }
 
     public async getCertificate(): Promise<string> {
-        return basicNetworkAdminCertificate;
+        throw new Error('not supported');
     }
 
     public getCertificatePath(): string {
-        return basicNetworkAdminCertificatePath;
+        throw new Error('not supported');
     }
 
     public async getPrivateKey(): Promise<string> {
-        return basicNetworkAdminPrivateKey;
+        throw new Error('not supported');
     }
 
-    public async isCreated(): Promise<boolean> {
-        const containerPrefix: string = this.docker.getContainerPrefix();
-        const created: boolean[] = await Promise.all([
-            this.docker.doesVolumeExist(`${containerPrefix}_peer0.org1.example.com`),
-            this.docker.doesVolumeExist(`${containerPrefix}_orderer.example.com`),
-            this.docker.doesVolumeExist(`${containerPrefix}_ca.example.com`),
-            this.docker.doesVolumeExist(`${containerPrefix}_couchdb`),
-            this.docker.doesVolumeExist(`${containerPrefix}_logs`)
-        ]);
-        return created.some((value: boolean) => value === true);
+    public async isCreated(outputAdapter?: OutputAdapter): Promise<boolean> {
+        try {
+            await this.execute('is_created', outputAdapter);
+            return true;
+        } catch (error) {
+            return false;
+        }
     }
 
-    public async isRunning(): Promise<boolean> {
-        const containerPrefix: string = this.docker.getContainerPrefix();
-        const running: boolean[] = await Promise.all([
-            this.docker.isContainerRunning(`${containerPrefix}_peer0.org1.example.com`),
-            this.docker.isContainerRunning(`${containerPrefix}_orderer.example.com`),
-            this.docker.isContainerRunning(`${containerPrefix}_ca.example.com`),
-            this.docker.isContainerRunning(`${containerPrefix}_couchdb`),
-            this.docker.isContainerRunning((`${containerPrefix}_logs`))
-        ]);
-        return !running.some((value: boolean) => value === false);
+    public async isRunning(outputAdapter?: OutputAdapter): Promise<boolean> {
+        try {
+            await this.execute('is_running', outputAdapter);
+            return true;
+        } catch (error) {
+            return false;
+        }
     }
 
     public isDevelopmentMode(): boolean {
@@ -222,7 +291,7 @@ export class FabricRuntime extends EventEmitter {
 
     public async getLogsAddress(): Promise<string> {
         const prefix: string = this.docker.getContainerPrefix();
-        const logsPorts: ContainerPorts = await this.docker.getContainerPorts(`${prefix}_logs`);
+        const logsPorts: ContainerPorts = await this.docker.getContainerPorts(`${prefix}_logspout`);
         const peerRequestHost: string = Docker.fixHost(logsPorts['80/tcp'][0].HostIp);
         const peerRequestPort: string = logsPorts['80/tcp'][0].HostPort;
         return `${peerRequestHost}:${peerRequestPort}`;
@@ -335,21 +404,13 @@ export class FabricRuntime extends EventEmitter {
         }
 
         const env: any = Object.assign({}, process.env, {
-            COMPOSE_PROJECT_NAME: this.docker.getContainerPrefix(),
-            CORE_CHAINCODE_MODE: this.developmentMode ? 'dev' : 'net',
-            CERTIFICATE_AUTHORITY_PORT: this.ports.certificateAuthority,
-            ORDERER_PORT: this.ports.orderer,
-            PEER_REQUEST_PORT: this.ports.peerRequest,
-            PEER_CHAINCODE_PORT: this.ports.peerChaincode,
-            PEER_EVENT_HUB_PORT: this.ports.peerEventHub,
-            COUCH_DB_PORT: this.ports.couchDB,
-            LOGS_PORT: this.ports.logs
+            CORE_CHAINCODE_MODE: this.developmentMode ? 'dev' : 'net'
         });
 
         if (process.platform === 'win32') {
-            await CommandUtil.sendCommandWithOutput('cmd', ['/c', `${script}.cmd`], basicNetworkPath, env, outputAdapter);
+            await CommandUtil.sendCommandWithOutput('cmd', ['/c', `${script}.cmd`], this.path, env, outputAdapter);
         } else {
-            await CommandUtil.sendCommandWithOutput('/bin/sh', [`${script}.sh`], basicNetworkPath, env, outputAdapter);
+            await CommandUtil.sendCommandWithOutput('/bin/sh', [`${script}.sh`], this.path, env, outputAdapter);
         }
     }
 }

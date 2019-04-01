@@ -11,7 +11,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
 */
+
 'use strict';
+
 import * as vscode from 'vscode';
 import { ExtensionCommands } from '../../ExtensionCommands';
 import { CertificateAuthorityTreeItem } from '../explorer/runtimeOps/CertificateAuthorityTreeItem';
@@ -20,18 +22,23 @@ import { LogType } from '../logging/OutputAdapter';
 import { UserInputUtil } from './UserInputUtil';
 import { FabricRuntimeManager } from '../fabric/FabricRuntimeManager';
 import { IFabricWallet } from '../fabric/IFabricWallet';
-import { FabricRuntime } from '../fabric/FabricRuntime';
-import { FabricConnectionFactory } from '../fabric/FabricConnectionFactory';
 import { IFabricRuntimeConnection } from '../fabric/IFabricRuntimeConnection';
+import { FabricNode, FabricRuntime } from '../fabric/FabricRuntime';
+import { FabricWalletGeneratorFactory } from '../fabric/FabricWalletGeneratorFactory';
+import { IFabricWalletGenerator } from '../fabric/IFabricWalletGenerator';
 
 export async function createNewIdentity(certificateAuthorityTreeItem?: CertificateAuthorityTreeItem): Promise<void> {
     const outputAdapter: VSCodeBlockchainOutputAdapter = VSCodeBlockchainOutputAdapter.instance();
     outputAdapter.log(LogType.INFO, undefined, 'createNewIdentity');
 
+    const runtimeManager: FabricRuntimeManager = FabricRuntimeManager.instance();
+    const runtime: FabricRuntime = runtimeManager.getRuntime();
+
+    let certificateAuthorityName: string;
     if (!certificateAuthorityTreeItem) {
         // Command called from the command palette or elsewhere
         // Check runtime is running
-        const isRunning: boolean = await FabricRuntimeManager.instance().getRuntime().isRunning();
+        const isRunning: boolean = await runtime.isRunning();
         if (!isRunning) {
             // Start local_fabric to connect
             await vscode.commands.executeCommand(ExtensionCommands.START_FABRIC);
@@ -41,10 +48,12 @@ export async function createNewIdentity(certificateAuthorityTreeItem?: Certifica
             }
         }
         // Ask which certificate authority to use
-        const certificateAuthorityName: string = await UserInputUtil.showCertificateAuthorityQuickPickBox('Choose certificate authority to create a new identity with');
+        certificateAuthorityName = await UserInputUtil.showCertificateAuthorityQuickPickBox('Choose certificate authority to create a new identity with');
         if (!certificateAuthorityName) {
             return;
         }
+    } else {
+        certificateAuthorityName = certificateAuthorityTreeItem.name;
     }
 
     // Ask for identity name
@@ -53,28 +62,24 @@ export async function createNewIdentity(certificateAuthorityTreeItem?: Certifica
         return;
     }
 
-    let connection: IFabricRuntimeConnection;
-
     try {
         const mspid: string = 'Org1MSP';
-        const adminName: string = 'Admin@org1.example.com';
         const affiliation: string = 'org1.department1'; // Currently works for org1.department1, org1.department2
         // check to see if identity of same name exists
-        const wallet: IFabricWallet = FabricRuntimeManager.instance().gatewayWallet;
+        const connection: IFabricRuntimeConnection = await runtimeManager.getConnection();
+        const node: FabricNode = connection.getNode(certificateAuthorityName);
+        const fabricWalletGenerator: IFabricWalletGenerator = FabricWalletGeneratorFactory.createFabricWalletGenerator();
+        const wallet: IFabricWallet = await fabricWalletGenerator.createLocalWallet(node.wallet);
         const identityExists: boolean = await wallet.exists(identityName);
         if (identityExists) {
             outputAdapter.log(LogType.ERROR, `An identity called ${identityName} already exists in the runtime wallet`, `An identity called ${identityName} already exists in the runtime wallet`);
             return;
         }
 
-        const runtime: FabricRuntime = await FabricRuntimeManager.instance().getRuntime();
-        connection = FabricConnectionFactory.createFabricRuntimeConnection(runtime);
-        // Connect and then register the user
-        await connection.connect(wallet, adminName);
-        const secret: string = await connection.register(identityName, affiliation);
+        const secret: string = await connection.register(certificateAuthorityName, identityName, affiliation);
 
         // Enroll the user
-        const details: { certificate: string, privateKey: string } = await connection.enroll(identityName, secret);
+        const details: { certificate: string, privateKey: string } = await connection.enroll(certificateAuthorityName, identityName, secret);
 
         // Import the new identity to the gateway wallet (no -ops in the name)
         await wallet.importIdentity(details.certificate, details.privateKey, identityName, mspid);
@@ -86,8 +91,6 @@ export async function createNewIdentity(certificateAuthorityTreeItem?: Certifica
         return;
     } catch (error) {
         outputAdapter.log(LogType.ERROR, `Issue creating new identity: ${error.message}`, `Issue creating new identity: ${error.toString()}`);
-
-        await connection.disconnect();
         return;
     }
 }

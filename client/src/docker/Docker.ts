@@ -42,8 +42,9 @@ export class Docker {
 
     public getContainerPrefix(): string {
         // Docker on Linux only supports basic characters for the project name.
-        const sanitizedName: string = this.name.replace(/[^A-Za-z0-9]/g, '');
-        return `fabricvscode${sanitizedName}`;
+        // const sanitizedName: string = this.name.replace(/[^A-Za-z0-9]/g, '');
+        // return `${sanitizedName}`;
+        return this.name;
     }
 
     public async getContainerPorts(containerID: string): Promise<ContainerPorts> {
