@@ -24,6 +24,9 @@ import { Docker, ContainerPorts } from '../docker/Docker';
 import { UserInputUtil } from '../commands/UserInputUtil';
 import { LogType } from '../logging/OutputAdapter';
 import * as request from 'request';
+import { FabricIdentity } from './FabricIdentity';
+import { FabricNode, FabricNodeType } from './FabricNode';
+import { FabricGateway } from './FabricGateway';
 
 const basicNetworkPath: string = path.resolve(__dirname, '..', '..', '..', 'basic-network');
 const basicNetworkConnectionProfilePath: string = path.resolve(basicNetworkPath, 'connection.json');
@@ -135,6 +138,74 @@ export class FabricRuntime extends EventEmitter {
             } else {
                 this.setState(FabricRuntimeState.STOPPED);
             }
+        }
+    }
+
+    public async getGateways(): Promise<FabricGateway[]> {
+        const connectionProfile: object = await this.getConnectionProfile();
+        return [
+            {
+                name: 'local_fabric',
+                path: this.getConnectionProfilePath(),
+                connectionProfile
+            }
+        ];
+    }
+
+    public async getNodes(): Promise<FabricNode[]> {
+        const containerPrefix: string = this.docker.getContainerPrefix();
+        const peerPorts: ContainerPorts = await this.docker.getContainerPorts(`${containerPrefix}_peer0.org1.example.com`);
+        const peerRequestPort: string = peerPorts['7051/tcp'][0].HostPort;
+        const caPorts: ContainerPorts = await this.docker.getContainerPorts(`${containerPrefix}_ca.example.com`);
+        const caPort: string = caPorts['7054/tcp'][0].HostPort;
+        const ordererPorts: ContainerPorts = await this.docker.getContainerPorts(`${containerPrefix}_orderer.example.com`);
+        const ordererPort: string = ordererPorts['7050/tcp'][0].HostPort;
+        return [
+            {
+                short_name: 'peer0.org1.example.com',
+                name: 'peer0.org1.example.com',
+                type: FabricNodeType.PEER,
+                url: `grpc://localhost:${peerRequestPort}`,
+                wallet: 'local_wallet',
+                identity: 'Admin@org1.example.com'
+            },
+            {
+                short_name: 'ca.example.com',
+                name: 'ca.example.com',
+                type: FabricNodeType.CERTIFICATE_AUTHORITY,
+                url: `http://localhost:${caPort}`,
+                wallet: 'local_wallet',
+                identity: 'admin'
+            },
+            {
+                short_name: 'orderer.example.com',
+                name: 'orderer.example.com',
+                type: FabricNodeType.ORDERER,
+                url: `grpc://localhost:${ordererPort}`,
+                wallet: 'local_wallet',
+                identity: 'Admin@org1.example.com'
+            }
+        ];
+    }
+
+    public async getWalletNames(): Promise<string[]> {
+        return [
+            'local_wallet'
+        ];
+    }
+
+    public async getIdentities(walletName: string): Promise<FabricIdentity[]> {
+        if (walletName !== 'local_wallet') {
+            throw new Error(`The wallet ${walletName} does not exist`);
+        } else {
+            return [
+                {
+                    name: 'Admin@org1.example.com',
+                    certificate: Buffer.from(basicNetworkAdminCertificate, 'utf8').toString('base64'),
+                    private_key: Buffer.from(basicNetworkAdminPrivateKey, 'utf8').toString('base64'),
+                    msp_id: 'Org1MSP'
+                }
+            ];
         }
     }
 
