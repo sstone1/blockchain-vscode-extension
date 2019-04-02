@@ -172,7 +172,7 @@ export class BlockchainRuntimeExplorerProvider implements BlockchainExplorerProv
         const channelMap: Map<string, Array<string>> = new Map<string, Array<string>>();
         return allPeerNames.reduce((promise: Promise<void>, peerName: string) => {
             return promise.then(() => {
-                return connection.getAllChannelsForPeer(peerName);
+                return connection.getAllChannelNames(peerName);
             }).then((channels: Array<any>) => {
                 channels.forEach((channelName: string) => {
                     let peers: Array<string> = channelMap.get(channelName);
@@ -269,15 +269,10 @@ export class BlockchainRuntimeExplorerProvider implements BlockchainExplorerProv
 
         try {
             const connection: IFabricRuntimeConnection = await FabricRuntimeManager.instance().getConnection();
-            const channelMap: Map<string, Array<string>> = await this.createChannelMap();
-            const channels: Array<string> = Array.from(channelMap.keys());
-            for (const channel of channels) {
-                const channelOrgs: any[] = await connection.getOrganizations(channel);
-                for (const org of channelOrgs) {
-                    tree.push(new OrgTreeItem(this, org.id));
-                }
+            const organizationNames: string[] = await connection.getAllOrganizationNames();
+            for (const organizationName of organizationNames) {
+                tree.push(new OrgTreeItem(this, organizationName));
             }
-
         } catch (error) {
             outputAdapter.log(LogType.ERROR, `Error populating organizations view: ${error.message}`, `Error populating organizations view: ${error.toString()}`);
             return tree;

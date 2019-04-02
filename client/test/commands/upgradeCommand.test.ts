@@ -92,7 +92,7 @@ describe('UpgradeCommand', () => {
             fabricRuntimeMock.getAllPeerNames.returns(['peerOne']);
 
             fabricRuntimeMock.getAllPeerNames.returns(['peerOne']);
-            fabricRuntimeMock.getAllChannelsForPeer.withArgs('peerOne').resolves(['channelOne']);
+            fabricRuntimeMock.getAllChannelNames.withArgs('peerOne').resolves(['channelOne']);
 
             fabricRuntimeMock.getInstantiatedChaincode.resolves([{ name: 'biscuit-network', version: '0.0.1' }]);
 

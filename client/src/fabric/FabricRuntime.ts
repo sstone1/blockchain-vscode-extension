@@ -238,18 +238,6 @@ export class FabricRuntime extends EventEmitter {
         return path.join(dir, 'connection.json');
     }
 
-    public async getCertificate(): Promise<string> {
-        return basicNetworkAdminCertificate;
-    }
-
-    public getCertificatePath(): string {
-        return basicNetworkAdminCertificatePath;
-    }
-
-    public async getPrivateKey(): Promise<string> {
-        return basicNetworkAdminPrivateKey;
-    }
-
     public async isCreated(): Promise<boolean> {
         const containerPrefix: string = this.docker.getContainerPrefix();
         const created: boolean[] = await Promise.all([

@@ -149,8 +149,8 @@ describe('UserInputUtil', () => {
         fabricConnectionStub = sinon.createStubInstance(FabricRuntimeConnection);
         fabricConnectionStub.getAllPeerNames.returns(['myPeerOne', 'myPeerTwo']);
 
-        fabricConnectionStub.getAllChannelsForPeer.withArgs('myPeerOne').resolves(['channelOne']);
-        fabricConnectionStub.getAllChannelsForPeer.withArgs('myPeerTwo').resolves(['channelOne', 'channelTwo']);
+        fabricConnectionStub.getAllChannelNames.withArgs('myPeerOne').resolves(['channelOne']);
+        fabricConnectionStub.getAllChannelNames.withArgs('myPeerTwo').resolves(['channelOne', 'channelTwo']);
 
         const chaincodeMap: Map<string, Array<string>> = new Map<string, Array<string>>();
         chaincodeMap.set('biscuit-network', ['0.0.1', '0.0.2']);

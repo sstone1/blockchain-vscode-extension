@@ -756,7 +756,7 @@ export class UserInputUtil {
         const quickPickItems: Array<IBlockchainQuickPickItem<Set<string>>> = [];
         const peerNames: Array<string> = connection.getAllPeerNames();
         for (const peerName of peerNames) {
-            const allChannels: Array<string> = await connection.getAllChannelsForPeer(peerName);
+            const allChannels: Array<string> = await connection.getAllChannelNames(peerName);
             allChannels.forEach((channel: string) => {
                 const foundItem: IBlockchainQuickPickItem<Set<string>> = quickPickItems.find((item: IBlockchainQuickPickItem<Set<string>>) => {
                     return channel === item.label;

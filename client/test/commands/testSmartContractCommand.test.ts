@@ -933,7 +933,7 @@ describe('testSmartContractCommand', () => {
             fabricConnectionManager = FabricConnectionManager.instance();
             getConnectionStub = mySandBox.stub(fabricConnectionManager, 'getConnection').returns(fabricRuntimeConnectionMock);
             fabricRuntimeConnectionMock.getAllPeerNames.returns(['peerThree']);
-            fabricRuntimeConnectionMock.getAllChannelsForPeer.withArgs('peerThree').resolves(['myChannelTunnel']);
+            fabricRuntimeConnectionMock.getAllChannelNames.withArgs('peerThree').resolves(['myChannelTunnel']);
             fabricRuntimeConnectionMock.getInstantiatedChaincode.resolves([
                 {
                     name: 'doubleDecker',

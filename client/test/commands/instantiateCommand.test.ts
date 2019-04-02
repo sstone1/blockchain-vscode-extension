@@ -104,7 +104,7 @@ describe('InstantiateCommand', () => {
             fabricRuntimeMock.getAllPeerNames.returns(['peerOne']);
 
             fabricRuntimeMock.getAllPeerNames.returns(['peerOne']);
-            fabricRuntimeMock.getAllChannelsForPeer.withArgs('peerOne').resolves(['myChannel']);
+            fabricRuntimeMock.getAllChannelNames.withArgs('peerOne').resolves(['myChannel']);
 
             fabricRuntimeMock.getInstantiatedChaincode.resolves([]);
 
