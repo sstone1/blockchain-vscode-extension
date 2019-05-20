@@ -38,6 +38,7 @@ export class ExtensionCommands {
 
     // GATEWAY VIEW
     static readonly ADD_GATEWAY: string = 'gatewaysExplorer.addGatewayEntry';
+    static readonly CONNECT_TO_CLOUD: string = 'gatewaysExplorer.connectToCloud';
     static readonly CONNECT: string = 'gatewaysExplorer.connectEntry';
     static readonly DELETE_GATEWAY: string = 'gatewaysExplorer.deleteGatewayEntry';
     static readonly DISCONNECT: string = 'gatewaysExplorer.disconnectEntry';

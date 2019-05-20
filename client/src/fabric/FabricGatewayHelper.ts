@@ -37,14 +37,39 @@ export class FabricGatewayHelper {
 
             const connectionProfileFile: string = await fs.readFile(connectionProfilePath, 'utf8');
             let connectionProfile: any;
-            let profilePath: string;
 
             if (connectionProfilePath.endsWith('.json')) {
                 connectionProfile = JSON.parse(connectionProfileFile);
-                profilePath = path.join(profileDirPath, 'connection.json');
             } else {
                 // Assume its a yml/yaml file type
                 connectionProfile = yaml.safeLoad(connectionProfileFile);
+            }
+
+            return this.importConnectionProfile(gatewayName, connectionProfilePath, connectionProfile);
+
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    public static async importConnectionProfile(gatewayName: string, connectionProfilePath: string, connectionProfile: any): Promise<string> {
+        try {
+
+            const extDir: string = vscode.workspace.getConfiguration().get(SettingConfigurations.EXTENSION_DIRECTORY);
+            const homeExtDir: string = UserInputUtil.getDirPath(extDir);
+            const profileDirPath: string = path.join(homeExtDir, gatewayName);
+            const profileExists: boolean = await fs.pathExists(profileDirPath);
+
+            if (!profileExists) {
+                await fs.ensureDir(profileDirPath);
+            }
+
+            let profilePath: string;
+
+            if (connectionProfilePath.endsWith('.json')) {
+                profilePath = path.join(profileDirPath, 'connection.json');
+            } else {
+                // Assume its a yml/yaml file type
                 profilePath = path.join(profileDirPath, 'connection.yml');
             }
 
