@@ -54,8 +54,9 @@ export async function teardownFabricRuntime(_treeItem?: RuntimeTreeItem, force: 
         }
 
         try {
-            await runtime.teardown(outputAdapter);
+            await runtime.deleteGateways();
             await runtime.deleteWalletsAndIdentities();
+            await runtime.teardown(outputAdapter);
         } catch (error) {
             outputAdapter.log(LogType.ERROR, `Failed to teardown ${FabricRuntimeUtil.LOCAL_FABRIC_DISPLAY_NAME}: ${error.message}`, `Failed to teardown ${FabricRuntimeUtil.LOCAL_FABRIC_DISPLAY_NAME}: ${error.toString()}`);
         }

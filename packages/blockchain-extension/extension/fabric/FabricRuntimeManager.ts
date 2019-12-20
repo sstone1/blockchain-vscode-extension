@@ -70,6 +70,9 @@ export class FabricRuntimeManager {
 
         }
 
+        // TODO: These two lines should be removed when we swap to Ansible, as
+        // wallets, identities, and gateways do not exist until generate time.
+
         // Import all of the wallets and identities as well.
         await this.runtime.importWalletsAndIdentities();
 

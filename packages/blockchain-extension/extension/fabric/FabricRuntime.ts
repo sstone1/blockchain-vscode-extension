@@ -81,12 +81,9 @@ export class FabricRuntime extends FabricEnvironment {
             destination: this.path,
             name: this.name,
             dockerName: this.dockerName,
-            orderer: this.ports.orderer,
-            peerRequest: this.ports.peerRequest,
-            peerChaincode: this.ports.peerChaincode,
-            certificateAuthority: this.ports.certificateAuthority,
-            couchDB: this.ports.couchDB,
-            logspout: this.ports.logs
+            numOrganizations: 2,
+            startPort: 17050,
+            endPort: 17069
         });
     }
 
@@ -150,8 +147,16 @@ export class FabricRuntime extends FabricEnvironment {
         }
     }
 
+    public async deleteGateways(): Promise<void> {
+        // Ensure that all known gateways are deleted.
+        const fabricGateways: FabricGateway[] = await this.getGateways();
+        for (const gateway of fabricGateways) {
+            await FabricGatewayRegistry.instance().delete(gateway.name);
+        }
+    }
+
     public async deleteWalletsAndIdentities(): Promise<void> {
-        // Ensure that all known identities in all known wallets are deleted.
+        // Ensure that all known wallets (and their identities) are deleted.
         const walletNames: string[] = await this.getWalletNames();
         for (const walletName of walletNames) {
             await FabricWalletRegistry.instance().delete(walletName);
@@ -212,6 +217,8 @@ export class FabricRuntime extends FabricEnvironment {
             this.setState(FabricRuntimeState.STOPPING);
             await this.teardownInner(outputAdapter);
             await this.create();
+            // TODO: These two lines should be removed when we swap to Ansible, as
+            // wallets, identities, and gateways do not exist until generate time.
             await this.importWalletsAndIdentities();
             await this.importGateways();
         } finally {

@@ -42,6 +42,7 @@ export async function startFabricRuntime(): Promise<void> {
             }
             await runtime.start(outputAdapter);
             await runtime.importWalletsAndIdentities();
+            await runtime.importGateways();
         } catch (error) {
             outputAdapter.log(LogType.ERROR, `Failed to start ${FabricRuntimeUtil.LOCAL_FABRIC_DISPLAY_NAME}: ${error.message}`, `Failed to start ${FabricRuntimeUtil.LOCAL_FABRIC_DISPLAY_NAME}: ${error.toString()}`);
         }
