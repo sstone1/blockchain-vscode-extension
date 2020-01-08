@@ -18,7 +18,10 @@ import * as request from 'request';
 import { SettingConfigurations } from '../../../configurations';
 import { FabricRuntimeState } from '../FabricRuntimeState';
 import { AnsibleEnvironment } from './AnsibleEnvironment';
-import { OutputAdapter, FabricNode, FabricNodeType, ConsoleOutputAdapter, FabricWalletRegistry } from 'ibm-blockchain-platform-common';
+import { OutputAdapter, FabricNode, FabricNodeType, ConsoleOutputAdapter, FabricWalletRegistry, LogType } from 'ibm-blockchain-platform-common';
+import * as loghose from 'docker-loghose';
+import * as through from 'through2';
+import stripAnsi = require('strip-ansi');
 
 export class ManagedAnsibleEnvironment extends AnsibleEnvironment {
     protected busy: boolean = false;
@@ -26,6 +29,7 @@ export class ManagedAnsibleEnvironment extends AnsibleEnvironment {
     protected isRunningPromise: Promise<boolean>;
 
     protected logsRequest: request.Request;
+    protected lh: any = null;
 
     constructor(name: string) {
         super(name);
@@ -170,14 +174,29 @@ export class ManagedAnsibleEnvironment extends AnsibleEnvironment {
     }
 
     public async startLogs(outputAdapter: OutputAdapter): Promise<void> {
-        const logspoutURL: string = await this.getLogspoutURL();
-        this.logsRequest = CommandUtil.sendRequestWithOutput(`${logspoutURL}/logs`, outputAdapter);
+        const opts: any = {
+            attachFilter: (id: any, dockerInspectInfo: any): boolean => {
+                const labels: object = dockerInspectInfo.Config.Labels;
+                const environmentName: string = labels['fabric-environment-name'];
+                return environmentName === this.name;
+            },
+            newline: true
+        };
+        const lh: any = loghose(opts);
+        lh.pipe(through.obj((chunk: any, enc: any, cb: any) => {
+            const name: string = chunk.name;
+            const line: string = stripAnsi(chunk.line);
+            outputAdapter.log(LogType.INFO, undefined, `${name}|${line}`);
+            cb();
+        }));
+        this.lh = lh;
     }
 
     public stopLogs(): void {
-        if (this.logsRequest) {
-            CommandUtil.abortRequest(this.logsRequest);
+        if (this.lh) {
+            this.lh.destroy();
         }
+        this.lh = null;
     }
 
     public setState(state: FabricRuntimeState): void {
